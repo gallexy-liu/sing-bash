@@ -1,0 +1,18 @@
+# Server data must never be published.
+conf/
+cert/
+subscribe/
+logs/
+list
+local-backups/
+backups/
+*.pem
+*.key
+*.tar
+*.tar.gz
+.env*
+tunnel.*
+warp_account.json
+*.log
+*.trace
+__pycache__/

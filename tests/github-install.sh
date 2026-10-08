@@ -42,7 +42,10 @@ ss -H -lnu 'sport = :58882' | grep -q .
 test -x /usr/bin/sb
 /usr/bin/sb --check > "$PRIVATE/shortcut.log" 2>&1
 test "$(/etc/sing-box/jq '[.outbounds[] | select(.type=="vless" or .type=="hysteria2")] | length' /etc/sing-box/subscribe/sing-box)" = 2
-! find /etc/sing-box/conf /etc/sing-box/cert /etc/sing-box/subscribe -type f -perm /077 | grep -q .
+if [ -n "$(find /etc/sing-box/conf /etc/sing-box/cert /etc/sing-box/subscribe -type f -perm /077 -print -quit)" ]; then
+  echo 'Generated private files have overly broad permissions.' >&2
+  exit 1
+fi
 find /etc/sing-box/conf /etc/sing-box/cert -type f -exec sha256sum {} + > "$PRIVATE/before.sha256"
 PID_BEFORE=$(systemctl show sing-box -p MainPID --value)
 test "$PID_BEFORE" -gt 0
@@ -57,6 +60,7 @@ if timeout 60 bash "$SOURCE/sing-box.sh" --install --SERVER_IP 127.0.0.1 > "$PRI
   echo 'Duplicate installation unexpectedly succeeded.' >&2
   exit 1
 fi
+grep -q '拒绝覆盖安装' "$PRIVATE/duplicate.log"
 sha256sum --status -c "$PRIVATE/before.sha256"
 systemctl is-active --quiet sing-box
 test "$(systemctl show sing-box -p MainPID --value)" = "$PID_BEFORE"

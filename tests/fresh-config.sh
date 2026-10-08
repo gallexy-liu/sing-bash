@@ -52,7 +52,13 @@ IS_SUB=no_sub
 IS_ARGO=no_argo
 NONINTERACTIVE_INSTALL=noninteractive_install
 CHOOSE_PROTOCOLS=bc
-START_PORT=58881
+# The real CI installation is still listening on 58881/58882.
+# Pick an unused pair for configuration-only validation, without starting a service.
+START_PORT=58891
+while is_port_in_use "$START_PORT" || is_port_in_use "$((START_PORT + 1))"; do
+  START_PORT=$((START_PORT + 2))
+  [ "$START_PORT" -lt 59091 ] || { echo 'FAIL: no free test port pair'; exit 1; }
+done
 SERVER_IP=127.0.0.1
 check_arch
 # Upstream interactive helpers intentionally use nonzero statuses; don't add global errexit to them.

@@ -58,6 +58,8 @@ sudo sb --check   # 校验服务端配置
 
 ## 验证
 
+[GitHub Actions 安装测试](https://github.com/gallexy-liu/sing-bash/actions/workflows/install-test.yml) 在推送到 `main`、提交 PR 或手动触发时，使用 GitHub 托管的 Ubuntu 22.04/24.04 虚拟机测试。它实际安装缺失的 jq、下载并校验内核、启动 systemd 服务、检查 TCP/UDP 监听，并验证 jq 修复不重启服务、重复安装保护和离线导出。不使用本地服务器或容器，不上传安装日志、配置、节点凭据或私钥。`tests/github-install.sh` 仅供一次性 GitHub 托管运行器使用。
+
 ```sh
 bash -n sing-box.sh
 sudo bash test-local.sh
@@ -67,6 +69,6 @@ sudo bash tests/fresh-config.sh
 
 测试使用 root 私有的临时配置副本，在无网络命名空间中运行原 Bash 导出逻辑，核对客户端节点参数及服务端配置/证书内容，并检查导出权限。测试不会修改运行中服务。只覆盖当前已有节点组合，并非所有协议和发行版的完整回归测试。
 
-`tests/download-integrity.sh` 使用模拟下载验证校验成功、摘要不匹配、下载失败和不允许的来源；失败时保留原目标文件。`tests/fresh-config.sh` 在私有临时目录复用已有内核，验证缺失 jq 的准备流程、Reality/Hysteria2 配置与证书生成、客户端导出、有 TUN 但无 WARP 账户及重复安装保护。它模拟包管理器和服务操作，不启动容器或代理服务。受测试机器内存限制，尚未完成干净系统上的真实下载、依赖安装及服务启动全流程验证。
+`tests/download-integrity.sh` 使用模拟下载验证校验成功、摘要不匹配、下载失败和不允许的来源；失败时保留原目标文件。`tests/fresh-config.sh` 在私有临时目录复用已有内核，验证缺失 jq 的准备流程、Reality/Hysteria2 配置与证书生成、客户端导出、有 TUN 但无 WARP 账户及重复安装保护。它模拟包管理器和服务操作，不启动容器或代理服务。真实安装流程由上述 GitHub Actions 验证；具体结果见工作流运行记录，未覆盖所有发行版及架构。
 
 不要提交 `/etc/sing-box`、订阅导出、私钥、账号文件、运行日志或服务器备份到 GitHub。

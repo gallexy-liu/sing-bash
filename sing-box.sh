@@ -3,7 +3,7 @@
 # Modified 2026-10-07: retain Bash menus; remove remote code, telemetry and key upload.
 
 # 当前脚本版本号
-VERSION='v1.3.25-local-bash.1 (2026.10.07)'
+VERSION='v1.3.25-local-bash.2 (2026.10.08)'
 
 # Github 反代加速代理
 GITHUB_PROXY=()
@@ -27,7 +27,9 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="${SCRIPT_DIR}/templates"
-DEFAULT_NEWEST_VERSION='1.15.0-alpha.6'
+# Fixed, reviewed release; ordinary menu use never upgrades installed binaries.
+INSTALL_SING_BOX_VERSION='1.15.0-alpha.9'
+INSTALL_CLOUDFLARED_VERSION='2026.10.0'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -1180,6 +1182,7 @@ input_hy2_realm() {
 input_hy2_warp() {
   # 无 TUN 时没有 warp-ep 出站，WARP 辅助打洞不可用，不询问
   [ "$IS_TUN" != 'is_tun' ] && return
+  grep -qs '"warp-ep"' "$WORK_DIR/conf/02_endpoints.json" || return
   local CHOOSE_WARP
   reading "\n $(text 148) " CHOOSE_WARP
   [[ "${CHOOSE_WARP,,}" =~ ^(y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp || unset IS_HY2_WARP
@@ -1825,21 +1828,21 @@ input_argo_auth() {
       ARGO_TYPE=is_json_argo
       ARGO_JSON=${ARGO_AUTH//[ ]/}
       [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
-      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run"
+      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --config ${WORK_DIR}/tunnel.yml run"
     elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{120,250}$ ]]; then
       ARGO_TYPE=is_token_argo
       ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
-      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}"
+      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate run --token ${ARGO_TOKEN}"
     elif [[ "${#ARGO_AUTH}" =~ ^[3-6][0-9]$ ]]; then
       hint "\n $(text 119) \n "
       create_argo_tunnel "${ARGO_AUTH}" "${ARGO_DOMAIN}" "${PORT_NGINX}"
       if [[ "$ARGO_JSON" =~ TunnelSecret ]]; then
         ARGO_TYPE=is_json_argo
         [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
-        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run"
+        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --config ${WORK_DIR}/tunnel.yml run"
       elif [[ "${#ARGO_TOKEN}" =~ ^[0-9]+$ && "${#ARGO_TOKEN}" -ge 120 && "${#ARGO_TOKEN}" -le 250 ]]; then
         ARGO_TYPE=is_token_argo
-        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}"
+        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate run --token ${ARGO_TOKEN}"
       else
         # 创建隧道失败，回退到使用临时隧道
         hint "\n $(text 117) \n "
@@ -1893,9 +1896,9 @@ change_argo() {
       cmd_systemctl disable argo
 
       if [ -n "$ARGO_TOKEN" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}@g" ${ARGO_DAEMON_FILE}
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 --no-autoupdate run --token ${ARGO_TOKEN}\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate run --token ${ARGO_TOKEN}@g" ${ARGO_DAEMON_FILE}
       elif [ -n "$ARGO_JSON" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run@g" ${ARGO_DAEMON_FILE}
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 --no-autoupdate --config ${WORK_DIR}/tunnel.yml run\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --config ${WORK_DIR}/tunnel.yml run@g" ${ARGO_DAEMON_FILE}
       fi
 
       # 更新相关配置文件中的域名
@@ -2179,7 +2182,7 @@ check_system_info() {
   RELEASE=("Debian" "Ubuntu" "CentOS" "Arch" "Alpine" "Fedora")
   EXCLUDE=("")
   MAJOR=("9" "16" "7" "3" "" "37")
-  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update --skip-broken" "pacman -Sy" "apk update -f" "dnf -y update")
+  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y makecache" "pacman -Sy" "apk update -f" "dnf -y makecache")
   PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache" "dnf -y install")
   PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "pacman -Rcnsu --noconfirm" "apk del -f" "dnf -y autoremove")
 
@@ -2863,14 +2866,129 @@ sing-box_variables() {
 }
 
 check_dependencies() {
-  local dep
-  for dep in bash openssl ip ss tar; do
-    command -v "$dep" >/dev/null 2>&1 || error "缺少本地依赖：$dep，请手动安装。"
+  local dep pkg
+  local -a packages=() commands=(curl openssl ip ss tar gzip flock xxd sha256sum ping ps iptables)
+  for dep in "${commands[@]}"; do
+    command -v "$dep" >/dev/null 2>&1 && continue
+    case "$dep" in
+      ip|ss) [[ "$SYSTEM" = CentOS || "$SYSTEM" = Fedora ]] && pkg=iproute || pkg=iproute2 ;;
+      flock) pkg=util-linux ;;
+      xxd) [[ "$SYSTEM" = CentOS || "$SYSTEM" = Fedora ]] && pkg=vim-common || pkg=xxd ;;
+      sha256sum) pkg=coreutils ;;
+      ps) [[ "$SYSTEM" = CentOS || "$SYSTEM" = Fedora || "$SYSTEM" = Arch ]] && pkg=procps-ng || pkg=procps ;;
+      ping) [[ "$SYSTEM" = Debian || "$SYSTEM" = Ubuntu ]] && pkg=iputils-ping || pkg=iputils ;;
+      *) pkg=$dep ;;
+    esac
+    [[ " ${packages[*]} " == *" $pkg "* ]] || packages+=("$pkg")
   done
-  [ -x "$WORK_DIR/jq" ] || error '缺少 /etc/sing-box/jq，请手动安装。'
+  if [ ! -x "$WORK_DIR/jq" ] && ! command -v jq >/dev/null 2>&1; then
+    packages+=(jq)
+  fi
+  if [ "$SYSTEM" = Alpine ]; then
+    command -v rc-service >/dev/null 2>&1 || packages+=(openrc)
+  else
+    command -v systemctl >/dev/null 2>&1 || packages+=(systemd)
+  fi
+  # A minimal image may have curl but no trusted CA bundle.
+  [[ -s /etc/ssl/certs/ca-certificates.crt || -s /etc/pki/tls/certs/ca-bundle.crt ]] || packages+=(ca-certificates)
+  if [ "${#packages[@]}" -gt 0 ]; then
+    info "自动安装系统依赖：${packages[*]}"
+    install_system_packages "${packages[@]}" || error '系统依赖安装失败，请检查软件源和网络。'
+  fi
+  for dep in "${commands[@]}"; do
+    command -v "$dep" >/dev/null 2>&1 || error "安装后仍缺少依赖：$dep"
+  done
+  mkdir -p "$WORK_DIR" || error '无法创建工作目录'
+  if [ ! -x "$WORK_DIR/jq" ]; then
+    local jq_path
+    jq_path=$(command -v jq) || error '系统 jq 安装失败'
+    install -m 700 "$jq_path" "$WORK_DIR/jq" || error '无法准备本地 jq'
+  fi
+  "$WORK_DIR/jq" --version >/dev/null || error '本地 jq 无法运行'
   IS_PREFER_GO=true
   command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved && IS_PREFER_GO=false
   return 0
+}
+
+install_system_packages() {
+  # Only install requested packages. Never run a distribution-wide upgrade.
+  case "$SYSTEM" in
+    Debian|Ubuntu) apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@" ;;
+    Alpine) apk add --no-cache "$@" ;;
+    Arch) pacman -S --needed --noconfirm "$@" ;;
+    CentOS|Fedora)
+      if command -v dnf >/dev/null 2>&1; then dnf install -y "$@"; else yum install -y "$@"; fi ;;
+    *) return 1 ;;
+  esac
+}
+
+download_verified() {
+  local url=$1 digest=$2 target=$3 actual
+  [[ "$url" == https://github.com/SagerNet/sing-box/releases/download/* ||
+     "$url" == https://github.com/cloudflare/cloudflared/releases/download/* ]] || return 1
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  # Do not expose an incomplete or unverified download at the target path.
+  rm -f -- "$target.part"
+  curl --proto '=https' --proto-redir '=https' -fSL --retry 2 \
+    --connect-timeout 15 --max-time 600 "$url" -o "$target.part" || { rm -f -- "$target.part"; return 1; }
+  actual=$(sha256sum "$target.part")
+  if [ "${actual%% *}" != "$digest" ]; then
+    rm -f -- "$target.part"
+    printf '下载文件 SHA-256 校验失败，拒绝执行。\n' >&2
+    return 1
+  fi
+  mv -- "$target.part" "$target"
+}
+
+detect_install_address() {
+  [ -z "$SERVER_IP" ] || return 0
+  local stack address
+  # First installation only. This fixed HTTPS request contains no keys or configuration.
+  # Supplying --SERVER_IP skips the request (useful for NAT/custom domains).
+  for stack in -4 -6; do
+    address=$(curl "$stack" --proto '=https' --proto-redir '=https' -fsSL \
+      --connect-timeout 3 --max-time 8 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null |
+      awk -F= '$1 == "ip" {gsub(/\r/, "", $2); print $2; exit}')
+    if [[ -n "$address" && "$address" =~ ^[0-9a-fA-F:.]+$ ]] && is_valid_server_addr "$address"; then
+      SERVER_IP=$address
+      return 0
+    fi
+  done
+  error '无法自动取得公网 IP；请使用 --SERVER_IP 指定服务器 IP 或域名。'
+}
+
+prepare_install_binaries() {
+  local digest archive member
+  # Digests from the official GitHub release asset metadata, fixed in this source.
+  case "$SING_BOX_ARCH" in
+    amd64) digest=8aede1f5935a856d939c61413677dc2e7e3eb0046efbc22b9a869229e6da279f ;;
+    amd64-musl) digest=7c5c314306918469ee26e9d072067912b619e4548a75bb2f20f4a31878b32551 ;;
+    arm64) digest=78a4a7fc588c47d810fa8475e8cebf56bafdc4c21cbd01bcfe313fabfc55e507 ;;
+    arm64-musl) digest=9a844fc6e82dd9dcf9f67e36c13226d3363fad9562121e7e3fca60061eda4d99 ;;
+    armv7) digest=e83af50c0a0e7476b62218f358a7c58f88bcc9e30c9c39f0da1d0886d8e86300 ;;
+    armv7-musl) digest=1d9eb7c02a38094a5c65912a7cbd9a67e132a337dd7e75cfbbb06fd28bc4dad2 ;;
+    *) error '没有此架构的已校验安装包' ;;
+  esac
+  archive="sing-box-${INSTALL_SING_BOX_VERSION}-linux-${SING_BOX_ARCH}"
+  info "下载固定版本 sing-box ${INSTALL_SING_BOX_VERSION} 并校验 SHA-256"
+  download_verified "https://github.com/SagerNet/sing-box/releases/download/v${INSTALL_SING_BOX_VERSION}/${archive}.tar.gz" \
+    "$digest" "$TEMP_DIR/sing-box.tar.gz" || error 'sing-box 下载或校验失败'
+  # Extract only the binary as data, never archive paths, links or install scripts.
+  member="$archive/sing-box"
+  tar -xzOf "$TEMP_DIR/sing-box.tar.gz" "$member" > "$TEMP_DIR/sing-box" || error 'sing-box 解压失败'
+  chmod 700 "$TEMP_DIR/sing-box"
+  "$TEMP_DIR/sing-box" version >/dev/null || error 'sing-box 无法在当前系统运行'
+  if [ "$IS_ARGO" = is_argo ] && [ ! -x "$WORK_DIR/cloudflared" ]; then
+    case "$ARGO_ARCH" in
+      amd64) digest=d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99db ;;
+      arm64) digest=e6422b9d4f72d3194bc5a38676f13667c06666523217b842a877d72a80b5ac08 ;;
+      arm) digest=1dbe8e4ec17e74bb7f49cf91db6a4903bd0f9fe41984556c7503e40b765fd099 ;;
+      *) error '没有此架构的 cloudflared 安装包' ;;
+    esac
+    download_verified "https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-linux-${ARGO_ARCH}" \
+      "$digest" "$TEMP_DIR/cloudflared" || error 'cloudflared 下载或校验失败'
+    chmod 700 "$TEMP_DIR/cloudflared"
+  fi
 }
 
 add_port_hopping_ufw_rules() {
@@ -3710,13 +3828,12 @@ EOF
 
   # 生成 endpoint 配置：仅在支持 TUN 时生成 wireguard warp-ep 出站。
   # 无 TUN（Hax / OpenVZ / 部分容器）无法创建 wireguard 出站，跳过注册与生成，避免 sing-box 启动失败。
-  if [ "$IS_TUN" = 'is_tun' ]; then
-    # 只接受本地个人账户；禁止在线注册及共享私钥回退。
-    if [ -s $TEMP_DIR/warp_account.json ] && warp_account_register "$(< "$TEMP_DIR/warp_account.json")"; then
-      rm -f "$TEMP_DIR/warp_account.json"
-    elif ! warp_account_register; then
-      error '缺少个人 WARP 账户；已禁止使用共享私钥。'
-    fi
+  # 新安装默认直连；有 TUN 设备不等于已提供个人 WARP 账户。
+  local HAS_WARP=false
+  if [ "$IS_TUN" = 'is_tun' ] && [ -s "$TEMP_DIR/warp_account.json" ]; then
+    warp_account_register "$(< "$TEMP_DIR/warp_account.json")" || error '本地 WARP 账户无效'
+    rm -f "$TEMP_DIR/warp_account.json"
+    HAS_WARP=true
 
     cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
 {
@@ -3755,7 +3872,7 @@ EOF
   # 生成 route 配置。OpenAI 分流依赖 warp-ep 出站，仅在支持 TUN 时添加
   # geosite-openai 规则集与分流规则；无 TUN 时保留通用 sniff / resolve 规则即可
   local OPENAI_RULE_SET OPENAI_RULES
-  if [ "$IS_TUN" = 'is_tun' ]; then
+  if [ "$HAS_WARP" = true ]; then
     OPENAI_RULE_SET='[
             {
                 "tag":"geosite-openai",
@@ -4760,12 +4877,27 @@ fetch_quicktunnel_domain() {
 
 # 安装 sing-box 全家桶
 install_sing-box() {
-  error '此本地版本管理已有安装；已停用在线全新安装。'
+  # Never overwrite an existing service/configuration, including another installer.
+  if [ -s "$SINGBOX_DAEMON_FILE" ] || [ -s /lib/systemd/system/sing-box.service ] ||
+     compgen -G "$WORK_DIR/conf/*.json" >/dev/null || [ -s "$WORK_DIR/cert/private.key" ]; then
+    error '已有 sing-box 服务、配置或私钥；请使用 sb 管理，拒绝覆盖安装。'
+  fi
+  [ "$IS_SUB" != is_sub ] || error '公开 HTTP 订阅仍已停用；请使用本地导出。'
+  [ "$IS_HY2_WARP" != is_hy2_warp ] || error '新安装不自动注册 WARP；请先配置个人账户。'
+  for asset in sb.sh install-local.sh LICENSE README.md upstream.json templates/clash templates/clash2 templates/sing-box; do
+    [ -s "$SCRIPT_DIR/$asset" ] || error "缺少本地文件 $asset；请下载完整仓库后安装。"
+  done
+  detect_install_address
+  prepare_install_binaries
   sing-box_variables
+  [[ "$START_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$START_PORT" -ge "$MIN_PORT" ] &&
+    [ "$START_PORT" -le "$MAX_PORT" ] || error '开始端口不在允许范围内'
+  for ((INSTALL_PORT=START_PORT; INSTALL_PORT<START_PORT+${#INSTALL_PROTOCOLS[@]}; INSTALL_PORT++)); do
+    is_port_in_use "$INSTALL_PORT" && error "端口 $INSTALL_PORT 已被占用；请使用 --START_PORT 指定空闲端口。"
+  done
   if [ -n "$PORT_NGINX" ] && ! command -v nginx >/dev/null 2>&1; then
     info "\n $(text 7) nginx \n"
-    ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-    ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
+    install_system_packages nginx || error 'nginx 安装失败'
     cmd_systemctl disable nginx
   fi
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
@@ -4774,11 +4906,11 @@ install_sing-box() {
   hint "\n $(text 2) " && wait
   sing-box_json
   echo "${L^^}" > ${WORK_DIR}/language
-  cp $TEMP_DIR/sing-box $TEMP_DIR/jq ${WORK_DIR}
-  [ -x $TEMP_DIR/qrencode ] && cp $TEMP_DIR/qrencode ${WORK_DIR}
+  "$TEMP_DIR/sing-box" check -C "$WORK_DIR/conf" >/dev/null 2>&1 || error '生成的服务配置校验失败；未启动服务。'
+  install -m 700 "$TEMP_DIR/sing-box" "$WORK_DIR/sing-box" || error '内核安装失败'
 
   # 生成 Argo systemd 配置文件，并复制 cloudflared 可执行二进制文件
-  cp $TEMP_DIR/cloudflared ${WORK_DIR}
+  [ ! -x "$TEMP_DIR/cloudflared" ] || install -m 700 "$TEMP_DIR/cloudflared" "$WORK_DIR/cloudflared" || error 'cloudflared 安装失败'
   [ -n "$ARGO_RUNS" ] && argo_systemd
 
   # 如果是 Json Argo，把配置文件复制到工作目录
@@ -5581,9 +5713,8 @@ $(hint "⬆ Outbound (total):  $(format_traffic $OUT_SUM)")
 
 # 创建快捷方式
 create_shortcut() {
-  # 不再创建在线入口；本地安装由 install-local.sh 完成。
-  [ -x "${WORK_DIR}/sb.sh" ] || { warning '请先运行本地 install-local.sh'; return 1; }
-  ln -sf "${WORK_DIR}/sb.sh" /usr/bin/sb
+  # Deploy the exact local copy and templates after successful first installation.
+  bash "$SCRIPT_DIR/install-local.sh" || error '本地管理入口安装失败'
 }
 
 change_protocols() {
@@ -6045,17 +6176,17 @@ menu_setting() {
     ACTION[11]() { blocked_remote_code -$L; exit; }
     ACTION[12]() { blocked_remote_code; exit; }
   else
-    OPTION[1]="1.  $(text 115)"
-    OPTION[2]="2.  $(text 34) + Argo + $(text 80) $(text 89)"
+    OPTION[1]="1.  快速安装 Reality + Hysteria2"
+    OPTION[2]="2.  公开 HTTP 订阅安装（已停用）"
     OPTION[3]="3.  $(text 34) + Argo $(text 89)"
-    OPTION[4]="4.  $(text 34) + $(text 80) $(text 89)"
+    OPTION[4]="4.  公开 HTTP 订阅安装（已停用）"
     OPTION[5]="5.  $(text 34)"
     OPTION[6]="6.  远程脚本入口（已停用）"
     OPTION[7]="7.  远程脚本入口（已停用）"
     OPTION[8]="8.  远程脚本入口（已停用）"
     OPTION[9]="9.  远程脚本入口（已停用）"
 
-    ACTION[1]() { IS_FAST_INSTALL='is_fast_install'; CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[1]() { IS_FAST_INSTALL='is_fast_install'; CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'bc'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='no_sub'; IS_ARGO='no_argo'; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[2]() { IS_SUB=is_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[3]() { IS_SUB=no_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[4]() { IS_SUB=is_sub; IS_ARGO=no_argo; install_sing-box; export_list install; create_shortcut; exit; }
@@ -6116,12 +6247,16 @@ menu() {
 check_cdn
 
 case "${1-}" in
+  --install) shift; set -- --LANGUAGE C --CHOOSE_PROTOCOLS bc "$@" ;;
+  --prepare-dependencies)
+    L=C; check_system_info; check_arch; check_dependencies; exit 0 ;;
   --check) exec "${WORK_DIR}/sing-box" check -C "${WORK_DIR}/conf" ;;
   --status) exec systemctl status sing-box --no-pager ;;
   --export) set -- -n ;;
   --version) set -- -v ;;
   --help|-h)
     printf '%s\n' 'sb: 原版 Bash 菜单（本地加固）' \
+      '  --install     全自动首次安装（默认 Reality + Hysteria2）' \
       '  -n / --export  导出节点（输出含凭据，仅限 root）' \
       '  -d            原版配置编辑菜单' \
       '  -r            原版协议增删菜单' \
@@ -6305,7 +6440,7 @@ check_system_ip
 check_install
 if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   # 预设默认值，允许只传 --CHOOSE_PROTOCOLS 进行最小无交互安装。
-  CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}
+  CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'bc'}
   START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
   CDN=${CDN:-"${CDN_DOMAIN[0]}"}
   IS_SUB=${IS_SUB:-'no_sub'}
@@ -6317,11 +6452,11 @@ if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   create_shortcut
 elif [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
   # 预设默认值
-  CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}
+  CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'bc'}
   START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
   CDN=${CDN:-"${CDN_DOMAIN[0]}"}
-  IS_SUB='is_sub'
-  IS_ARGO='is_argo'
+  IS_SUB=${IS_SUB:-'no_sub'}
+  IS_ARGO=${IS_ARGO:-'no_argo'}
   [[ "$HY2_PORT_HOPPING_RANGE" =~ ^[0-9]+:[0-9]+$ ]] && IS_HOPPING='is_hopping' || IS_HOPPING='no_hopping'
 
   install_sing-box

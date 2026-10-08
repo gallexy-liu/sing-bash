@@ -1,12 +1,17 @@
 #!/bin/bash
-# Install this reviewed local Bash copy over an existing fscarmen installation.
+# Install sing-box on a fresh machine, or deploy this local manager over an existing installation.
 # Backs up management files only; does not change server conf/cert or reload service.
 set -euo pipefail
 umask 077
 [ "$EUID" = 0 ] || { printf '请使用 sudo bash install-local.sh\n' >&2; exit 1; }
 HERE=$(cd -- "$(dirname -- "$0")" && pwd -P)
 ROOT=/etc/sing-box
-[ -x "$ROOT/sing-box" ] && [ -x "$ROOT/jq" ] && [ -d "$ROOT/conf" ]
+if [ ! -x "$ROOT/sing-box" ] || [ ! -d "$ROOT/conf" ]; then
+  exec /bin/bash "$HERE/sing-box.sh" --install "$@"
+fi
+if [ ! -x "$ROOT/jq" ] || ! command -v flock >/dev/null 2>&1; then
+  /bin/bash "$HERE/sing-box.sh" --prepare-dependencies
+fi
 command -v flock >/dev/null
 bash -n "$HERE/sing-box.sh"
 bash -n "$HERE/sb.sh"
@@ -31,7 +36,7 @@ rollback() {
   fi
 }
 trap rollback EXIT
-install -m 600 "$HERE/sing-box.sh" "$HERE/LICENSE" "$HERE/upstream.json" "$HERE/README.md" "$STAGE/"
+install -m 600 "$HERE/sing-box.sh" "$HERE/sb.sh" "$HERE/install-local.sh" "$HERE/LICENSE" "$HERE/upstream.json" "$HERE/README.md" "$STAGE/"
 install -d -m 700 "$STAGE/templates"
 install -m 600 "$HERE/templates/"* "$STAGE/templates/"
 [ ! -e "$ROOT/local-bash" ] || mv "$ROOT/local-bash" "$BACKUP/replaced-local-bash"
